@@ -1,52 +1,71 @@
 import chisel3._
 import chisel3.util._
 import ZirconConfig.Fetch._
+import ZirconConfig.Dispatch._
 import ZirconUtil._
 
 class DispatcherIO extends Bundle {
+    // nfch(4)个前端Package输入
     val ftePkg = Vec(nfch, Flipped(Decoupled(new BackendPackage)))
-    val func   = Input(Vec(nfch, UInt((nfch+2).W)))
+
+    // nfch个nfch+2位宽向量，指示指令被发到哪个FU
+    val func   = Input(Vec(nfch, UInt((nfunUnit).W)))
+
+    // nfch个后端Package输出
     val bkePkg = Vec(nfch, Decoupled(new BackendPackage))
 }
 
 class Dispatcher extends Module {
     val io = IO(new DispatcherIO)
 
-    val bkePkgAllReday = io.bkePkg.map(_.ready).reduce(_ && _)
-    val aluInstructionIndexes = WireDefault(VecInit.fill(nfch)(0.U(nfch.W)))
-    var aluInstructionIndex = 1.U(nfch.W)
-    for(i <- 0 until nfch){
-        aluInstructionIndexes(i) := Mux(io.func(i)(nfch+1), aluInstructionIndex, 0.U(nfch.W))
-        aluInstructionIndex = Mux(io.func(i)(nfch+1), ShiftAdd1(aluInstructionIndex), aluInstructionIndex)
+    // 所有后端Package ready
+    val bkePkgAllReady = io.bkePkg.map(_.ready).reduce(_ && _)
+
+    // 初始化输出端口，默认无效
+    io.bkePkg.foreach { pkg =>
+        pkg.valid := false.B
+        pkg.bits  := DontCare
     }
-    val fpuInstructionIndexes = WireDefault(VecInit.fill(nfch)(0.U(nfch.W)))
-    var fpuInstructionIndex = 1.U(nfch.W)
-    for(i <- 0 until nfch){
-        fpuInstructionIndexes(i) := Mux(io.func(i)(nfch), fpuInstructionIndex, 0.U(nfch.W))
-        fpuInstructionIndex = Mux(io.func(i)(nfch), ShiftAdd1(fpuInstructionIndex), fpuInstructionIndex)
-    }
-    val intFuncMap = WireDefault(VecInit.fill(4)(0.U(nfch.W)))
-    val intFuncHit = WireDefault(VecInit.fill(4)(false.B))
-    val floatFuncMap = WireDefault(VecInit.fill(2)(0.U(nfch.W)))
-    val floatFuncHit = WireDefault(VecInit.fill(2)(false.B))
-    for(i <- 0 until nfch){
-        if(i < 4) {
-            // Integer Function Pipeline
-            intFuncMap(i) := VecInit(io.func.map(_(i))).asUInt
-            intFuncHit(i) := intFuncMap(i).orR
-            val intFuncNotHitBeforeNum = BitAlign(if(i == 0) 0.U else PopCount(~(VecInit(intFuncHit.take(i)).asUInt)), log2Ceil(nfch))
-            val portMap = Mux(intFuncHit(i), intFuncMap(i), aluInstructionIndexes(intFuncNotHitBeforeNum))
-            io.bkePkg(i).valid := portMap.orR
-            io.bkePkg(i).bits := Mux1H(portMap, io.ftePkg.map(_.bits))
-        }else {
-            // Floating Point Function Pipeline
-            floatFuncMap(i-4) := VecInit(io.func.map(_(i))).asUInt
-            floatFuncHit(i-4) := floatFuncMap(i-4).orR
-            val floatFuncNotHitBeforeNum = BitAlign(if(i == 4) 0.U else PopCount(~(VecInit(floatFuncHit.take(i-4)).asUInt)), log2Ceil(nfch))
-            val portMap = Mux(floatFuncHit(i-4), floatFuncMap(i-4), fpuInstructionIndexes(floatFuncNotHitBeforeNum))
-            io.bkePkg(i).valid := portMap.orR
-            io.bkePkg(i).bits := Mux1H(portMap, io.ftePkg.map(_.bits))
+
+    val request_matrix = Wire(Vec(nfch + 1, Vec(nfch, UInt(nfunUnit.W))))
+    request_matrix(0) := io.func
+
+    // Generate nfch stages of priority logic
+    for (stage <- 0 until nfch) {
+        // 寻找可用FU最少的指令
+        val popcounts = request_matrix(stage).map(PopCount(_))
+
+        val (min_pop, min_idx) = popcounts.zipWithIndex
+            .map { case (p, i) => (Mux(p === 0.U, (nfunUnit + 1).U, p), i.U) } // 忽略已无请求的指令
+            // reduce-reduceTree
+            .reduce[(UInt, UInt)] { case ((p1, i1), (p2, i2)) =>
+            val choose_p1 = p1 < p2
+            val min_p_result = Mux(choose_p1, p1, p2)
+            val min_i_result = Mux(choose_p1, i1, i2)
+            (min_p_result, min_i_result)
+        }
+
+        // 分配FU
+        // log2OH PriorityMux
+        val chosen_fu_oh = PriorityEncoderOH(request_matrix(stage)(min_idx))
+        // 可用FU矩阵更新
+        for (instr_idx <- 0 until nfch) {
+            // 如果当前指令在本阶段被授权，下一阶段它的所有请求都清零
+            // 同时，所有其他指令的请求中，已经被占用的FU位也需要被清零
+            val Mask = ~chosen_fu_oh(stage) // 掩码，清除已被占用的FU
+            request_matrix(stage + 1)(instr_idx) := request_matrix(stage)(instr_idx) & Mask
         }
     }
-    io.ftePkg.foreach{ ftePkg => ftePkg.ready := bkePkgAllReday }
+
+    // 驱动bkePkg
+    for (fu_idx <- 0 until nfunUnit) {
+        val grant_vec_for_fu = request_matrix(nfch)(fu_idx)
+        when(grant_vec_for_fu.orR) {
+            io.bkePkg(fu_idx).valid := true.B
+            io.bkePkg(fu_idx).bits  := Mux1H(grant_vec_for_fu, io.ftePkg.map(_.bits))
+        }
+    }
+
+    // --- 反压信号 ---
+    io.ftePkg.foreach { ftePkg => ftePkg.ready := bkePkgAllReady }
 }

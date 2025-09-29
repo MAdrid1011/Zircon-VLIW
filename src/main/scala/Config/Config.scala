@@ -51,10 +51,15 @@ object Issue{
     val niq  = Fetch.nfch
 }
 object Fetch{
-    val nfch = 6
+    val nfch = 8
 }
 
 object Decode{
     val ndcd = Fetch.nfch
     val wdecode = log2Ceil(ndcd)
 }
+
+object Dispatch{
+    val nfunUnit = Fetch.nfch
+}
+
