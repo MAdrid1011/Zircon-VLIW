@@ -9,7 +9,7 @@ class DispatcherIO extends Bundle {
     val ftePkg = Vec(nfch, Flipped(Decoupled(new BackendPackage)))
 
     // nfch个nfch+2位宽向量，指示指令被发到哪个FU
-    val func   = Input(Vec(nfch, UInt((nfunUnit).W)))
+    val func   = Input(Vec(nfch, UInt((nfuncUnit).W)))
 
     // nfch个后端Package输出
     val bkePkg = Vec(nfch, Decoupled(new BackendPackage))
@@ -27,7 +27,7 @@ class Dispatcher extends Module {
         pkg.bits  := DontCare
     }
 
-    val request_matrix = Wire(Vec(nfch + 1, Vec(nfch, UInt(nfunUnit.W))))
+    val request_matrix = Wire(Vec(nfch + 1, Vec(nfch, UInt(nfuncUnit.W))))
     request_matrix(0) := io.func
 
     // Generate nfch stages of priority logic
@@ -36,7 +36,7 @@ class Dispatcher extends Module {
         val popcounts = request_matrix(stage).map(PopCount(_))
 
         val (min_pop, min_idx) = popcounts.zipWithIndex
-            .map { case (p, i) => (Mux(p === 0.U, (nfunUnit + 1).U, p), i.U) } // 忽略已无请求的指令
+            .map { case (p, i) => (Mux(p === 0.U, (nfuncUnit + 1).U, p), i.U) } // 忽略已无请求的指令
             // reduce-reduceTree
             .reduce[(UInt, UInt)] { case ((p1, i1), (p2, i2)) =>
             val choose_p1 = p1 < p2
@@ -58,7 +58,7 @@ class Dispatcher extends Module {
     }
 
     // 驱动bkePkg
-    for (fu_idx <- 0 until nfunUnit) {
+    for (fu_idx <- 0 until nfuncUnit) {
         val grant_vec_for_fu = request_matrix(nfch)(fu_idx)
         when(grant_vec_for_fu.orR) {
             io.bkePkg(fu_idx).valid := true.B

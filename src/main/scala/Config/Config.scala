@@ -60,6 +60,6 @@ object Decode{
 }
 
 object Dispatch{
-    val nfunUnit = Fetch.nfch
+    val nfuncUnit = Fetch.nfch
 }
 

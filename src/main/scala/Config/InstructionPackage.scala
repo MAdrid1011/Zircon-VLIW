@@ -2,6 +2,7 @@ import chisel3._
 import chisel3.util._
 import ZirconConfig.RegisterFile._
 import ZirconConfig.Fetch._
+import ZirconConfig.Dispatch._
 
 class PredictInfo extends Bundle {
     val offset     = UInt(32.W)
@@ -22,7 +23,7 @@ class FrontendPackage extends Bundle {
     val inst       = UInt(32.W)
     val op         = UInt(9.W)
     val imm        = UInt(32.W)
-    val func       = UInt((nfch+2).W)
+    val func       = UInt((nfuncUnit).W)
     val rinfo      = new RegisterInfo()
 }
 
