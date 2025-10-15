@@ -22,7 +22,7 @@ class Frontend extends Module {
 
     val npc = Module(new NPC)
     val dcd = VecInit.fill(nfch)(Module(new Decoder).io)
-    val pc  = RegInit(0x7FFFFFE8.U(32.W))
+    val pc  = RegInit(0x7FFFFFE0.U(32.W))
 
     /* Previous Fetch Stage */
     val instPkgPF = WireDefault(VecInit.fill(nfch)(0.U.asTypeOf(new FrontendPackage)))

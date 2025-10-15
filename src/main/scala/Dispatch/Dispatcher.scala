@@ -13,6 +13,7 @@ class DispatcherIO extends Bundle {
 
     // nfch个后端Package输出
     val bkePkg = Vec(nfch, Decoupled(new BackendPackage))
+
 }
 
 class Dispatcher extends Module {
@@ -27,16 +28,23 @@ class Dispatcher extends Module {
         pkg.bits  := DontCare
     }
 
-    val request_matrix = Wire(Vec(nfch + 1, Vec(nfch, UInt(nfuncUnit.W))))
-    request_matrix(0) := io.func
+    val funcMaskTable = Wire(Vec(nfch + 1, Vec(nfch, UInt(nfuncUnit.W))))
+    val funcIdTable = Wire(Vec(nfch, UInt(nfuncUnit.W)))
+    val ftePkgTable = Wire(Vec(nfch, (new BackendPackage)))
+
+
+    funcMaskTable(0) := io.func
 
     // Generate nfch stages of priority logic
     for (stage <- 0 until nfch) {
         // 寻找可用FU最少的指令
-        val popcounts = request_matrix(stage).map(PopCount(_))
-
-        val (min_pop, min_idx) = popcounts.zipWithIndex
-            .map { case (p, i) => (Mux(p === 0.U, (nfuncUnit + 1).U, p), i.U) } // 忽略已无请求的指令
+        // 统计当前所有指令可用FU数
+        // TODO
+        val currentPopCntList = funcMaskTable(stage).map(PopCount(_))
+        
+        // 选出可用FU最少的指令和索引
+        val (min_pop, min_idx) = currentPopCntList.zipWithIndex
+            .map { case (p, i) => (Mux(p === 0.U, (nfuncUnit + 1).U, p), (1<<i).U) } // 忽略已无请求的指令
             // reduce-reduceTree
             .reduce[(UInt, UInt)] { case ((p1, i1), (p2, i2)) =>
             val choose_p1 = p1 < p2
@@ -47,23 +55,24 @@ class Dispatcher extends Module {
 
         // 分配FU
         // log2OH PriorityMux
-        val chosen_fu_oh = PriorityEncoderOH(request_matrix(stage)(min_idx))
+        // 对可用FU最少的一条指令掩码进行优先级编码
+        val fuAllocOh = PriorityEncoderOH(Mux1H(min_idx,funcMaskTable(stage)))
+        funcIdTable(stage) := fuAllocOh
+        ftePkgTable(stage) := Mux1H(min_idx,io.ftePkg.map(_.bits)) 
+        // io.bkePkg(fuIdx).valid := true.B
+        // io.bkePkg(fuIdx).bits  := io.ftePkg(min_idx).bits
+
         // 可用FU矩阵更新
         for (instr_idx <- 0 until nfch) {
-            // 如果当前指令在本阶段被授权，下一阶段它的所有请求都清零
-            // 同时，所有其他指令的请求中，已经被占用的FU位也需要被清零
-            val Mask = ~chosen_fu_oh(stage) // 掩码，清除已被占用的FU
-            request_matrix(stage + 1)(instr_idx) := request_matrix(stage)(instr_idx) & Mask
+            val Mask = ~fuAllocOh // 掩码，清除已被占用的FU
+            val current_request = funcMaskTable(stage)(instr_idx)
+            funcMaskTable(stage + 1)(instr_idx) := Mux(min_idx(instr_idx), 0.U,current_request & Mask) 
         }
     }
-
-    // 驱动bkePkg
-    for (fu_idx <- 0 until nfuncUnit) {
-        val grant_vec_for_fu = request_matrix(nfch)(fu_idx)
-        when(grant_vec_for_fu.orR) {
-            io.bkePkg(fu_idx).valid := true.B
-            io.bkePkg(fu_idx).bits  := Mux1H(grant_vec_for_fu, io.ftePkg.map(_.bits))
-        }
+    val funcIdTableTrans = Transpose(funcIdTable)
+    io.bkePkg.zipWithIndex.foreach{case (p , i) => 
+        p.valid := true.B
+        p.bits := Mux1H(funcIdTableTrans(i),ftePkgTable)
     }
 
     // --- 反压信号 ---

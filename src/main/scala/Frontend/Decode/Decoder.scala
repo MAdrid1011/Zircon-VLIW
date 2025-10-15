@@ -2,6 +2,7 @@ import chisel3._
 import chisel3.util._
 import ZirconConfig.EXEOp._
 import ZirconConfig.Issue._
+import ZirconConfig.Fetch._
 import ZirconUtil._
 
 class DecoderIO extends Bundle{
@@ -10,7 +11,7 @@ class DecoderIO extends Bundle{
     val rinfo   = Output(new RegisterInfo())
     val op      = Output(UInt(7.W))
     val imm     = Output(UInt(32.W))
-    val func    = Output(UInt(niq.W))
+    val func    = Output(UInt(nfch.W))
 }
 
 class Decoder extends Module{
@@ -87,6 +88,10 @@ class Decoder extends Module{
     io.rinfo.rk := rk
 
     // TODO
-    io.func := isMem ## (isMuldiv || isPriv) ## !(isMem || isMuldiv || isPriv)
-
+    val isAlu = isAlgebraReg || isAlgebraImm || isLui || isAuipc
+    val isBranch = isBr || isJal || isJalr
+    // io.func := isMem ## (isMuldiv || isPriv) ## !(isMem || isMuldiv || isPriv)
+    io.func := (isAlu || isBranch) ## (isAlu || isMem) ## (isAlu || isMem) ## (isAlu || isMuldiv) ## (isAlu || isMuldiv) ## 
+               (isAlu || isMuldiv) ## (isAlu || isMuldiv) ## (isPriv)
+    // 后三个需要在实现F D扩展后改为相应的FPU/FDIV判断码
 }
