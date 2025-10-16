@@ -6,7 +6,7 @@ object Main extends App {
         "-disable-all-randomization", 
         "-strip-debug-info",
         "-strip-fir-debug-info",
-        "-O=release",
+        "-O=debug",
         "--ignore-read-enable-mem",
         "--lower-memories",
         "--lowering-options=noAlwaysComb, disallowPackedArrays, disallowLocalVariables, explicitBitcast, disallowMuxInlining, disallowExpressionInliningInPorts",
