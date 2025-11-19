@@ -9,7 +9,8 @@ class Simulator {
     private val mem     = new Memory()
     private val rf      = new LogicRegFile()
     private val fetch   = new Fetch(mem, baseAddr)
-    private val decoder = new InstDecoder(rf, mem, fetch, instRecorder)
+    private val frf     = new FloatRegFile()
+    private val decoder = new InstDecoder(rf, frf, mem, fetch, instRecorder)
 
     // debug
     private val iring = new RingBuffer[(UInt, UInt)](8)

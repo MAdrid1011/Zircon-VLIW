@@ -1,30 +1,27 @@
 import chisel3._
 import chisel3.util._
-import ZirconConfig.Fetch._
-import ZirconConfig.JumpOp._
-
-class NPCCommitIO extends Bundle {
-    val flush      = Input(Bool())
-    val jumpEn     = Input(Bool())
-    val jumpTgt    = Input(UInt(32.W))
+class NPCBackendIO extends Bundle {
+    val branchTgt   = Input(UInt(32.W))
+    val predFail    = Input(Bool())
+    val stall       = Input(Bool())
 }
 class NPCFetchIO extends Bundle {
     val pc         = Input(UInt(32.W))
     val npc        = Output(UInt(32.W))
-    val validMask  = Output(Vec(nfch, Bool()))
 }
 class NPCIO extends Bundle {
-    val cmt = new NPCCommitIO
-    val fch  = new NPCFetchIO
+    val backend = new NPCBackendIO
+    val fetch = new NPCFetchIO
 }
 class NPC extends Module {
-    val io             = IO(new NPCIO)
-    val pc             = WireDefault(io.fch.pc)
-    val offset         = WireDefault((nfch * 4).U)
-    when(io.cmt.flush){
-        io.fch.npc := BLevelPAdder32(io.cmt.jumpTgt, Mux(io.cmt.jumpEn, 0.U, 4.U), 0.U).io.res
+    val io = IO(new NPCIO)
+    val npc = WireDefault(io.fetch.pc)
+    when(io.backend.predFail){
+        npc := io.backend.branchTgt
+    }.elsewhen(io.backend.stall){
+        npc := io.fetch.pc
     }.otherwise{
-        io.fch.npc := BLevelPAdder32(io.fch.pc, (4 * nfch).U, 0.U).io.res
+        npc := io.fetch.pc + 32.U  // 8条指令，每条4字节，所以是+32
     }
-    io.fch.validMask := VecInit.fill(nfch)(true.B)
+    io.fetch.npc := npc
 }

@@ -17,6 +17,6 @@ class Fetch(mem: Memory, baseAddr: UInt) {
     }
 
     def fetch(): UInt = {
-        mem.read(pc, 2)
+        UInt(mem.read(pc, 2).toLong)
     }
 }
