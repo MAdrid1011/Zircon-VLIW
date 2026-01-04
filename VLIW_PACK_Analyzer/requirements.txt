@@ -1,0 +1,3 @@
+# VLIW_PACK_Analyzer - 无外部依赖
+# Python >= 3.8
+
