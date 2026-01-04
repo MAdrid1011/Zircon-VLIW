@@ -4,7 +4,7 @@
 
 from typing import List, Optional
 from config import SINGLE_CYCLE_ALU, MULTI_CYCLE_INST, BRANCH_JUMP_INST, PADDING_INST
-from config import INT_REG_ALIAS, FLOAT_REG_ALIAS
+from config import INT_REG_ALIAS, FLOAT_REG_ALIAS, ONE_LEVEL_DEPENDENCY_ELIGIBLE
 
 
 class Instruction:
@@ -25,6 +25,7 @@ class Instruction:
         # 指令属性
         self.is_nop = self._check_is_nop()
         self.is_single_cycle = self._check_is_single_cycle()
+        self.can_one_level_dep = self._check_can_one_level_dependency()
         self.inst_type = self._determine_type()
         
         # 解析操作数，提取寄存器
@@ -48,6 +49,10 @@ class Instruction:
     def _check_is_single_cycle(self) -> bool:
         """检查是否为单周期 ALU 指令"""
         return self.mnemonic in SINGLE_CYCLE_ALU
+    
+    def _check_can_one_level_dependency(self) -> bool:
+        """检查是否可以参与一层依赖（作为 consumer）"""
+        return self.mnemonic in ONE_LEVEL_DEPENDENCY_ELIGIBLE
     
     def _determine_type(self) -> str:
         """确定指令类型"""

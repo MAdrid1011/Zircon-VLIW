@@ -8,6 +8,7 @@ from parser import DisassemblyParser
 from dependency import DependencyAnalyzer
 from packer import VLIWPacker
 from statistics import StatisticsCollector
+from exporter import DisassemblyExporter
 
 
 class VLIWAnalyzer:
@@ -28,6 +29,7 @@ class VLIWAnalyzer:
         self.dep_analyzer = DependencyAnalyzer()
         self.packer = VLIWPacker()
         self.stats_collector = StatisticsCollector()
+        self.exporter = DisassemblyExporter()
         
         # 数据存储
         self.original_packages = []
@@ -150,4 +152,22 @@ class VLIWAnalyzer:
             f.write(report)
         
         print(f"报告已保存到: {output_path}")
+    
+    def export_reordered_asm(self, output_path: str):
+        """
+        导出重排后的反汇编文件
+        
+        Args:
+            output_path: 输出文件路径
+        """
+        if not self.optimized_packages:
+            print("错误：尚未运行分析，请先调用 run_full_analysis()")
+            return
+        
+        self.exporter.export_reordered_asm(
+            self.original_packages,
+            self.optimized_packages,
+            output_path
+        )
+        print(f"重排后反汇编已保存到: {output_path}")
 

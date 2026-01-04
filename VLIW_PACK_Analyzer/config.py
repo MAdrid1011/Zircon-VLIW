@@ -74,6 +74,10 @@ FLOAT_REG_ALIAS = {
     'ft8': 'f28', 'ft9': 'f29', 'ft10': 'f30', 'ft11': 'f31'
 }
 
+# 可参与一层依赖的指令（单周期完成，EX2 阶段可前递）
+# 包括：单周期 ALU 指令 + 分支/跳转指令
+ONE_LEVEL_DEPENDENCY_ELIGIBLE = SINGLE_CYCLE_ALU | BRANCH_JUMP_INST
+
 # VLIW 包大小
 VLIW_PACKAGE_SIZE = 8
 

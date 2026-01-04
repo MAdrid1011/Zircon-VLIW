@@ -47,7 +47,8 @@ class DependencyAnalyzer:
         
         一层依赖的条件：
         1. consumer 依赖 producer
-        2. producer 和 consumer 都是单周期 ALU 指令
+        2. producer 是单周期 ALU 指令（生产值）
+        3. consumer 可以参与一层依赖（单周期 ALU 或 Branch 指令）
         
         Args:
             producer: 生产者指令
@@ -56,8 +57,12 @@ class DependencyAnalyzer:
         Returns:
             是否可以形成一层依赖
         """
-        # 两者都必须是单周期 ALU 指令
-        if not (producer.is_single_cycle and consumer.is_single_cycle):
+        # producer 必须是单周期 ALU（生产值）
+        if not producer.is_single_cycle:
+            return False
+        
+        # consumer 必须可以参与一层依赖（单周期 ALU 或 Branch 指令）
+        if not consumer.can_one_level_dep:
             return False
         
         # consumer 必须依赖 producer

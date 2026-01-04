@@ -47,6 +47,12 @@ def main():
         action='store_true'
     )
     
+    parser.add_argument(
+        '--export-asm', '-e',
+        help='导出重排后的反汇编文件路径',
+        default=None
+    )
+    
     args = parser.parse_args()
     
     # 检查输入文件是否存在
@@ -67,6 +73,10 @@ def main():
         else:
             report = analyzer.generate_report(verbose=args.verbose)
             print(report)
+        
+        # 导出重排后的反汇编
+        if args.export_asm:
+            analyzer.export_reordered_asm(args.export_asm)
         
         return 0
     
