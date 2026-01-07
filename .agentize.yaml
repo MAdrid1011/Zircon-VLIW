@@ -1,0 +1,5 @@
+project:
+  name: Zircon-VLIW
+  lang: python
+git:
+  default_branch: main
