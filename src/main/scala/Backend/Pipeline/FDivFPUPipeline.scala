@@ -34,7 +34,7 @@ class FDivFPUPipeline extends Module {
     alu.io.op := ex1Pkg.op
     
     // FDiv实例化
-    val fdiv = Module(new FDiv)
+    val fdiv = Module(new FDivWrapper)
     fdiv.io.rs1Data := ex1Rs1Data
     fdiv.io.rs2Data := ex1Rs2Data
     fdiv.io.op := ex1Pkg.op

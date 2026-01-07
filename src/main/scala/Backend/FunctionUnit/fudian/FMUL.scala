@@ -279,7 +279,7 @@ class FMUL(val expWidth: Int, val precision: Int) extends Module {
   multiplier.io.a := raw_a.sig
   multiplier.io.b := raw_b.sig
 
-  printf("a sig: %b b sig: %b\n",raw_a.exp, raw_b.exp)
+  // printf("a sig: %b b sig: %b\n",raw_a.exp, raw_b.exp)
 
   multiplier.io.regEnables.foreach(_ := true.B)
 
