@@ -1,0 +1,56 @@
+import chisel3._
+import chisel3.util._
+import ZirconConfig.Issue._
+import ZirconConfig.Decode._
+import ZirconConfig.RegisterFile._
+
+import fudian._
+
+class FPUIO(val expWidth: Int, val precision: Int) extends Bundle {
+    //val instPkg  = Flipped(Decoupled(new BackendPackage))
+    val instPkg  = Input(new BackendPackage)
+    val result = Output(UInt((expWidth + precision).W))
+    val fflags = Output(UInt(5.W))
+}
+
+class FPU(val expWidth: Int, val precision: Int) extends Module {
+    val io = IO(new FPUIO(expWidth, precision))
+
+    val fmul = Module(new FMUL(expWidth, precision))
+    val fadd = Module(new FCMA_ADD(expWidth, precision, precision))
+
+    // signals
+    val FCMAEnable = ShiftRegister(io.instPkg.op(4,3) === 0x2.U(2.W) && io.instPkg.op(0) === 0x1.U(1.W), 3, 0.U, true.B)//need a delay here to enable FCMA at a correct timing!
+    //val FCMAEnable = 0.U(1.W)
+    //FCMA disabled, subtraction has severe timing issue
+    val FMULEnable = io.instPkg.op(4,0) === 0x2.U(5.W)
+    val FADDEnable = io.instPkg.op(4,0) === 0x0.U(5.W)
+    val fnmsub = (io.instPkg.op(4,0) === 0x17.U(5.W))
+    val fnm = (io.instPkg.op(4,0) === 0x15.U(5.W)) || fnmsub
+    val sub  = (io.instPkg.op(4,0) === 0x1.U(5.W))
+
+    fmul.io.a := io.instPkg.src1   //src1
+    fmul.io.b := io.instPkg.src2    //src2
+    fmul.io.rm := io.instPkg.op(7,5)
+
+    fadd.io.a := io.instPkg.src1 
+    fadd.io.b := (io.instPkg.src2(31) ^ sub) ## io.instPkg.src2(30, 0)
+    fadd.io.b_inter_valid := false.B
+    fadd.io.b_inter_flags := DontCare
+    fadd.io.rm := io.instPkg.op(7,5)
+
+    io.result := Mux(FMULEnable, fmul.io.result, fadd.io.result)
+    // io.rf.wr.rdVld  := true.B
+    // io.rf.wr.rd     := io.instPkg.rd
+
+    io.fflags := fadd.io.fflags
+
+}
+
+// class Negater(val expWidth: Int, val precision: Int) extends Module{
+//     val io = IO({
+//         val enable = Input(UInt(1.W))
+//         val in     = Input(UInt((expWidth + precision).W))
+//         val out    = Output(UInt((expWidth + precision).W)) 
+//     })
+// }
