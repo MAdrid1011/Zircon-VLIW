@@ -44,17 +44,6 @@ class ALUFPUPipeline(val convertType: Int = 0) extends Module {
     fpuConvert.io.op := ex1Pkg.op
     fpuConvert.io.rm := ex1Pkg.rm
     
-    // 判断是否是类型转换指令
-    val isConvert = if (convertType == 1) {
-        // FPToInt: FCVT.W.S, FCVT.WU.S
-        ex1Pkg.op === ZirconConfig.EXEOp.FCVT_W_S || 
-        ex1Pkg.op === ZirconConfig.EXEOp.FCVT_WU_S
-    } else {
-        // IntToFP: FCVT.S.W, FCVT.S.WU
-        ex1Pkg.op === ZirconConfig.EXEOp.FCVT_S_W || 
-        ex1Pkg.op === ZirconConfig.EXEOp.FCVT_S_WU
-    }
-    
     // EX1阶段更新InstPkg
     val ex1PkgOut = ex1Pkg.EX1Update(alu.io.res, 0.U, false.B)
     

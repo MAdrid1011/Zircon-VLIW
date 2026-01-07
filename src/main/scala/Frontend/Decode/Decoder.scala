@@ -162,5 +162,8 @@ class Decoder(ALU: Boolean, FPU: Boolean, Branch: Boolean, Mem: Boolean, IMulDiv
         B_TYPE -> SE(inst(31) ## inst(7) ## inst(30, 25) ## inst(11, 8) ## 0.U(1.W), 32),
     ))
 
-    io.instPkgOut := io.instPkgIn.IDUpdate(rs1, rs2, rs3, rd, rdValid, op, immGen(immType, io.instPkgIn.inst), src1Sel, src2Sel)
+    // rm (rounding mode) 位于 inst[14:12]
+    val rm = io.instPkgIn.inst(14, 12)
+
+    io.instPkgOut := io.instPkgIn.IDUpdate(rs1, rs2, rs3, rd, rdValid, op, rm, immGen(immType, io.instPkgIn.inst), src1Sel, src2Sel)
 }

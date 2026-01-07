@@ -54,9 +54,6 @@ class FDivFPUPipeline extends Module {
     fpu.io.op := ex1Pkg.op
     fpu.io.rm := ex1Pkg.rm
     
-    // 判断是否是FPU/FDiv指令（op[6]=1表示浮点指令）
-    val isFPUOp = ex1Pkg.op(6)
-    
     // EX1阶段更新InstPkg
     val ex1PkgOut = ex1Pkg.EX1Update(alu.io.res, 0.U, false.B)
     

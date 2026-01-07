@@ -105,3 +105,11 @@ object Valid {
     val Y = true.B
     val N = false.B
 }
+
+// 单精度浮点参数 (IEEE 754 single precision)
+object FloatConfig {
+    val expWidth = 8       // 指数位宽
+    val precision = 24     // 尾数精度 (包含隐含位)
+    val fpWidth = 32       // 浮点数总位宽
+    val signBit = 31       // 符号位位置
+}

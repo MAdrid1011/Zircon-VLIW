@@ -18,13 +18,12 @@ class FPUIO extends Bundle {
 class FPU extends Module {
     val io = IO(new FPUIO)
     
-    // 单精度浮点参数
-    val expWidth = 8
-    val precision = 24
+    // 使用统一的浮点参数配置
+    val expWidth = ZirconConfig.FloatConfig.expWidth
+    val precision = ZirconConfig.FloatConfig.precision
     
     // 操作码解析
     val op = io.op
-    val isFloat = op(6)  // op[6]=1 表示浮点指令
     
     // 指令判断（基于 Config.scala 中的 EXEOp 定义）
     val isFADD   = op === ZirconConfig.EXEOp.FADD_S
@@ -50,10 +49,11 @@ class FPU extends Module {
     val isCmp = isFLE || isFLT || isFEQ
     
     // ========== FADD/FSUB 模块 ==========
+    val signBit = ZirconConfig.FloatConfig.signBit
     val fadd = Module(new FCMA_ADD(expWidth, precision, precision))
-    val subSign = Mux(isFSUB, ~io.rs2Data(31), io.rs2Data(31))
+    val subSign = Mux(isFSUB, ~io.rs2Data(signBit), io.rs2Data(signBit))
     fadd.io.a := io.rs1Data
-    fadd.io.b := subSign ## io.rs2Data(30, 0)
+    fadd.io.b := subSign ## io.rs2Data(signBit - 1, 0)
     fadd.io.b_inter_valid := false.B
     fadd.io.b_inter_flags := DontCare
     fadd.io.rm := io.rm
@@ -75,14 +75,14 @@ class FPU extends Module {
     // FSGNJ:  result = |rs1| with sign of rs2
     // FSGNJN: result = |rs1| with negated sign of rs2  
     // FSGNJX: result = |rs1| with XOR of signs
-    val rs1Sign = io.rs1Data(31)
-    val rs2Sign = io.rs2Data(31)
+    val rs1Sign = io.rs1Data(signBit)
+    val rs2Sign = io.rs2Data(signBit)
     val sgnjSign = Mux1H(Seq(
         isFSGNJ  -> rs2Sign,
         isFSGNJN -> (~rs2Sign),
         isFSGNJX -> (rs1Sign ^ rs2Sign)
     ))
-    val sgnjResult = sgnjSign ## io.rs1Data(30, 0)
+    val sgnjResult = sgnjSign ## io.rs1Data(signBit - 1, 0)
     
     // ========== FMIN/FMAX ==========
     // 使用 FCMP 的比较结果
@@ -141,9 +141,6 @@ class FPU extends Module {
     // FMUL 内部有2级寄存器，所以 fmul 结果延迟3拍
     val faddResult = fadd.io.result
     val fmulResult = fmul.io.result
-    
-    // 判断当前是否需要流水结果
-    val needsPipeResult = isAddSub || isMul
     
     // 最终结果选择
     // 对于需要流水的操作，在 EX3 阶段取结果

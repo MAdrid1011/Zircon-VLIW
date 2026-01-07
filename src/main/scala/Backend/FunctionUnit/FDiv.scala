@@ -23,9 +23,9 @@ class FDivIO extends Bundle {
 class FDiv extends Module {
     val io = IO(new FDivIO)
     
-    // 单精度浮点参数
-    val expWidth = 8
-    val precision = 24
+    // 使用统一的浮点参数配置
+    val expWidth = ZirconConfig.FloatConfig.expWidth
+    val precision = ZirconConfig.FloatConfig.precision
     
     // 实例化 fudian FDIV
     val fdiv = Module(new FDIV(expWidth, precision))

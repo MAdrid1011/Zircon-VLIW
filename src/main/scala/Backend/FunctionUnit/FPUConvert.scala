@@ -16,9 +16,9 @@ class FPUConvertIO extends Bundle {
 class FPUConvert(val convertType: Int) extends Module {
     val io = IO(new FPUConvertIO)
     
-    // 单精度浮点参数
-    val expWidth = 8
-    val precision = 24
+    // 使用统一的浮点参数配置
+    val expWidth = ZirconConfig.FloatConfig.expWidth
+    val precision = ZirconConfig.FloatConfig.precision
     
     val op = io.op
     
